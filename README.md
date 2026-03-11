@@ -2,6 +2,8 @@
 
 FastAPI backend for an issue tracking system similar to a simplified Jira.
 
+![CI](https://github.com/gpoljsak2k/issue-tracker-api/actions/workflows/ci.yml/badge.svg)
+
 ## Features
 
 - User authentication (JWT)
