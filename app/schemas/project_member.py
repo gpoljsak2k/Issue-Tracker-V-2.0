@@ -5,6 +5,9 @@ class ProjectMemberCreate(BaseModel):
     user_id: int
     role: Literal["admin", "member", "viewer"]
 
+class ProjectMemberUpdate(BaseModel):
+    role: Literal["admin", "member", "viewer"]
+
 class ProjectMemberResponse(BaseModel):
     id: int
     project_id: int

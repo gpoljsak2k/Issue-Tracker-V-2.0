@@ -26,3 +26,16 @@ class LabelResponse(BaseModel):
 
 class IssueLabelAttach(BaseModel):
     label_id: int
+
+class LabelUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    color: str | None = Field(default=None, min_length=4, max_length=20)
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
+            raise ValueError("Color must be a valid hex code like #FF5733")
+        return value

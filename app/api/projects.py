@@ -20,12 +20,11 @@ from app.schemas.activity_log import ActivityLogResponse
 from typing import Literal
 from app.models.label import Label
 from app.models.issue_label import IssueLabel
-from app.schemas.label import LabelCreate, LabelResponse, IssueLabelAttach
-
+from app.schemas.label import LabelCreate, LabelResponse, IssueLabelAttach, LabelUpdate
+from app.schemas.project_member import ProjectMemberResponse, ProjectMemberCreate, ProjectMemberUpdate
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 def create_project(
@@ -61,23 +60,70 @@ def create_project(
     db.refresh(project)
     return project
 
-@router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
-def list_project_members(
+@router.get("/", response_model=list[ProjectResponse])
+def list_my_projects(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    projects = db.scalars(
+        select(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .where(ProjectMember.user_id == current_user.id)
+        .order_by(Project.id.desc())
+    ).all()
+
+    return projects
+
+@router.get("/{project_id}", response_model=ProjectResponse)
+def get_project(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    project = db.scalar(
+        select(Project).where(Project.id == project_id)
+    )
+
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
     get_project_membership_or_403(
         db=db,
         project_id=project_id,
         user_id=current_user.id,
     )
 
-    members = db.scalars(
-        select(ProjectMember).where(ProjectMember.project_id == project_id)
+    return project
+
+@router.get("/{project_id}/activity", response_model=list[ActivityLogResponse])
+def list_project_activity(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+
+    logs = db.scalars(
+        select(ActivityLog)
+        .where(ActivityLog.project_id == project_id)
+        .order_by(ActivityLog.created_at.desc())
     ).all()
 
-    return members
+    return logs
 
 @router.post(
     "/{project_id}/members",
@@ -143,6 +189,145 @@ def add_project_member(
     db.commit()
     db.refresh(membership)
     return membership
+
+@router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
+def list_project_members(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+
+    members = db.scalars(
+        select(ProjectMember).where(ProjectMember.project_id == project_id)
+    ).all()
+
+    return members
+
+@router.patch(
+    "/{project_id}/members/{user_id}",
+    response_model=ProjectMemberResponse,
+)
+def update_project_member_role(
+    project_id: int,
+    user_id: int,
+    member_in: ProjectMemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    current_membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_role(current_membership, {"owner", "admin"})
+
+    target_membership = db.scalar(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
+        )
+    )
+    if target_membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project member not found",
+        )
+
+    if target_membership.role == "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner role cannot be changed",
+        )
+
+    old_role = target_membership.role
+    new_role = member_in.role
+
+    if old_role != new_role:
+        target_membership.role = new_role
+
+        create_activity_log(
+            db,
+            project_id=project_id,
+            actor_id=current_user.id,
+            action="member_role_updated",
+            metadata_json={
+                "target_user_id": user_id,
+                "old_role": old_role,
+                "new_role": new_role,
+            },
+        )
+
+    db.commit()
+    db.refresh(target_membership)
+    return target_membership
+
+@router.delete(
+    "/{project_id}/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_project_member(
+    project_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    current_membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_role(current_membership, {"owner", "admin"})
+
+    target_membership = db.scalar(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
+        )
+    )
+    if target_membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project member not found",
+        )
+
+    if target_membership.role == "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner cannot be removed from the project",
+        )
+
+    create_activity_log(
+        db,
+        project_id=project_id,
+        actor_id=current_user.id,
+        action="member_removed",
+        metadata_json={
+            "removed_user_id": user_id,
+            "old_role": target_membership.role,
+        },
+    )
+
+    db.delete(target_membership)
+    db.commit()
 
 @router.post(
     "/{project_id}/issues",
@@ -473,33 +658,6 @@ def list_issue_comments(
 
     return comments
 
-@router.get("/{project_id}/activity", response_model=list[ActivityLogResponse])
-def list_project_activity(
-    project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    project = db.scalar(select(Project).where(Project.id == project_id))
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-
-    get_project_membership_or_403(
-        db=db,
-        project_id=project_id,
-        user_id=current_user.id,
-    )
-
-    logs = db.scalars(
-        select(ActivityLog)
-        .where(ActivityLog.project_id == project_id)
-        .order_by(ActivityLog.created_at.desc())
-    ).all()
-
-    return logs
-
 @router.patch(
     "/{project_id}/issues/{issue_id}/comments/{comment_id}",
     response_model=CommentResponse,
@@ -772,6 +930,139 @@ def list_project_labels(
 
     return labels
 
+@router.patch(
+    "/{project_id}/labels/{label_id}",
+    response_model=LabelResponse,
+)
+def update_label(
+    project_id: int,
+    label_id: int,
+    label_in: LabelUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_write_access(membership)
+
+    label = db.scalar(
+        select(Label).where(
+            Label.id == label_id,
+            Label.project_id == project_id,
+        )
+    )
+    if label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found",
+        )
+
+    update_data = label_in.model_dump(exclude_unset=True)
+
+    if "name" in update_data:
+        existing_label = db.scalar(
+            select(Label).where(
+                Label.project_id == project_id,
+                Label.name == update_data["name"],
+                Label.id != label_id,
+            )
+        )
+        if existing_label is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Label name already exists in this project",
+            )
+
+    changes = {}
+    for field, new_value in update_data.items():
+        old_value = getattr(label, field)
+        if old_value != new_value:
+            changes[field] = {"old": old_value, "new": new_value}
+            setattr(label, field, new_value)
+
+    if changes:
+        create_activity_log(
+            db,
+            project_id=project_id,
+            actor_id=current_user.id,
+            action="label_updated",
+            metadata_json={
+                "label_id": label.id,
+                "changes": changes,
+            },
+        )
+
+    db.commit()
+    db.refresh(label)
+    return label
+
+@router.delete(
+    "/{project_id}/labels/{label_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_label(
+    project_id: int,
+    label_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_write_access(membership)
+
+    label = db.scalar(
+        select(Label).where(
+            Label.id == label_id,
+            Label.project_id == project_id,
+        )
+    )
+    if label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found",
+        )
+
+    create_activity_log(
+        db,
+        project_id=project_id,
+        actor_id=current_user.id,
+        action="label_deleted",
+        metadata_json={
+            "label_id": label.id,
+            "name": label.name,
+        },
+    )
+
+    issue_labels = db.scalars(
+        select(IssueLabel).where(IssueLabel.label_id == label.id)
+    ).all()
+
+    for issue_label in issue_labels:
+        db.delete(issue_label)
+
+    db.delete(label)
+    db.commit()
+
 @router.post(
     "/{project_id}/issues/{issue_id}/labels",
     status_code=status.HTTP_201_CREATED,
@@ -882,3 +1173,76 @@ def list_issue_labels(
     ).all()
 
     return labels
+
+@router.delete(
+    "/{project_id}/issues/{issue_id}/labels/{label_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_label_from_issue(
+    project_id: int,
+    issue_id: int,
+    label_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    issue = db.scalar(
+        select(Issue).where(
+            Issue.id == issue_id,
+            Issue.project_id == project_id,
+        )
+    )
+    if issue is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found",
+        )
+
+    membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_write_access(membership)
+
+    label = db.scalar(
+        select(Label).where(
+            Label.id == label_id,
+            Label.project_id == project_id,
+        )
+    )
+    if label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found",
+        )
+
+    issue_label = db.scalar(
+        select(IssueLabel).where(
+            IssueLabel.issue_id == issue_id,
+            IssueLabel.label_id == label_id,
+        )
+    )
+    if issue_label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label is not attached to this issue",
+        )
+
+    create_activity_log(
+        db,
+        project_id=project_id,
+        issue_id=issue_id,
+        actor_id=current_user.id,
+        action="label_removed_from_issue",
+        metadata_json={
+            "label_id": label.id,
+            "label_name": label.name,
+        },
+    )
+
+    db.delete(issue_label)
+    db.commit()
+
+
+
+

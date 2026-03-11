@@ -104,6 +104,23 @@ http://localhost:8000/docs
 
 ---
 
+# Seed Demo Data
+
+```bash
+docker compose exec web python -m scripts.seed_demo
+```
+**Demo users:**
+
+**username:**	**password:**
+owner	    OwnerPass1!
+admin	    AdminPass1!
+member	    MemberPass1!
+viewer	    ViewerPass1!
+
+Demo project key:
+- DEMO
+
+
 # Running Tests
 
 ```bash
@@ -150,6 +167,7 @@ app
 ├── schemas    # Pydantic schemas
 └── services   # business logic
 
+scripts        # utility scripts (demo data)
 tests          # pytest test suite
 alembic        # database migrations
 docker         # postgres initialization
@@ -160,7 +178,6 @@ docker         # postgres initialization
 
 # Possible Improvements
 
-* Issue comments API
 * Label filtering for issues
 * Project dashboard statistics
 * Full-text search using PostgreSQL
