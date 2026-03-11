@@ -32,3 +32,9 @@ class IssueUpdate(BaseModel):
     status: Literal["todo", "in_progress", "in_review", "done", "blocked"] | None = None
     priority: Literal["low", "medium", "high", "urgent"] | None = None
     assignee_id: int | None = None
+
+class PaginatedIssueResponse(BaseModel):
+    items: list[IssueResponse]
+    total: int
+    limit: int
+    offset: int

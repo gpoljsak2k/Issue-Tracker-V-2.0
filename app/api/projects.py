@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select, or_, case, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -11,12 +11,17 @@ from app.schemas.project import ProjectCreate, ProjectResponse
 from app.schemas.project_member import ProjectMemberResponse, ProjectMemberCreate
 from app.core.permissions import get_project_membership_or_403, require_project_role, can_manage_comment, require_project_write_access
 from app.models.issue import Issue
-from app.schemas.issue import IssueCreate, IssueResponse, IssueUpdate
+from app.schemas.issue import IssueCreate, IssueResponse, IssueUpdate, PaginatedIssueResponse
 from app.models.comment import Comment
 from app.schemas.comment import CommentCreate, CommentResponse, CommentUpdate
 from app.services.activity_service import create_activity_log
 from app.models.activity_log import ActivityLog
 from app.schemas.activity_log import ActivityLogResponse
+from typing import Literal
+from app.models.label import Label
+from app.models.issue_label import IssueLabel
+from app.schemas.label import LabelCreate, LabelResponse, IssueLabelAttach
+
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -208,9 +213,22 @@ def create_issue(
     db.refresh(issue)
     return issue
 
-@router.get("/{project_id}/issues", response_model=list[IssueResponse])
+@router.get("/{project_id}/issues", response_model=PaginatedIssueResponse)
 def list_project_issues(
     project_id: int,
+    status_filter: Literal["todo", "in_progress", "in_review", "done", "blocked"] | None = Query(
+        default=None,
+        alias="status",
+    ),
+    priority: Literal["low", "medium", "high", "urgent"] | None = Query(default=None),
+    assignee_id: int | None = Query(default=None),
+    search: str | None = Query(default=None, min_length=1, max_length=100),
+    sort_by: Literal["created_at", "updated_at", "priority", "status", "title"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -227,11 +245,73 @@ def list_project_issues(
         user_id=current_user.id,
     )
 
-    issues = db.scalars(
-        select(Issue).where(Issue.project_id == project_id)
-    ).all()
+    base_query = select(Issue).where(Issue.project_id == project_id)
 
-    return issues
+    if status_filter is not None:
+        base_query = base_query.where(Issue.status == status_filter)
+
+    if priority is not None:
+        base_query = base_query.where(Issue.priority == priority)
+
+    if assignee_id is not None:
+        base_query = base_query.where(Issue.assignee_id == assignee_id)
+
+    if search is not None:
+        search_term = f"%{search}%"
+        base_query = base_query.where(
+            or_(
+                Issue.title.ilike(search_term),
+                Issue.description.ilike(search_term),
+            )
+        )
+
+    total = db.scalar(
+        select(func.count()).select_from(base_query.subquery())
+    )
+
+    priority_order = case(
+        (Issue.priority == "low", 1),
+        (Issue.priority == "medium", 2),
+        (Issue.priority == "high", 3),
+        (Issue.priority == "urgent", 4),
+        else_=999,
+    )
+
+    status_order = case(
+        (Issue.status == "todo", 1),
+        (Issue.status == "in_progress", 2),
+        (Issue.status == "in_review", 3),
+        (Issue.status == "blocked", 4),
+        (Issue.status == "done", 5),
+        else_=999,
+    )
+
+    sort_column_map = {
+        "created_at": Issue.created_at,
+        "updated_at": Issue.updated_at,
+        "priority": priority_order,
+        "status": status_order,
+        "title": Issue.title,
+    }
+    sort_column = sort_column_map[sort_by]
+
+    query = base_query
+
+    if order == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    query = query.limit(limit).offset(offset)
+
+    issues = db.scalars(query).all()
+
+    return {
+        "items": issues,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 @router.patch(
     "/{project_id}/issues/{issue_id}",
@@ -602,3 +682,203 @@ def delete_issue(
 
     db.delete(issue)
     db.commit()
+
+@router.post(
+    "/{project_id}/labels",
+    response_model=LabelResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_label(
+    project_id: int,
+    label_in: LabelCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_write_access(membership)
+
+    existing_label = db.scalar(
+        select(Label).where(
+            Label.project_id == project_id,
+            Label.name == label_in.name,
+        )
+    )
+    if existing_label is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Label name already exists in this project",
+        )
+
+    label = Label(
+        project_id=project_id,
+        name=label_in.name,
+        color=label_in.color,
+    )
+
+    db.add(label)
+    db.flush()
+
+    create_activity_log(
+        db,
+        project_id=project_id,
+        actor_id=current_user.id,
+        action="label_created",
+        metadata_json={
+            "label_id": label.id,
+            "name": label.name,
+            "color": label.color,
+        },
+    )
+
+    db.commit()
+    db.refresh(label)
+    return label
+
+@router.get("/{project_id}/labels", response_model=list[LabelResponse])
+def list_project_labels(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+
+    labels = db.scalars(
+        select(Label)
+        .where(Label.project_id == project_id)
+        .order_by(Label.name.asc())
+    ).all()
+
+    return labels
+
+@router.post(
+    "/{project_id}/issues/{issue_id}/labels",
+    status_code=status.HTTP_201_CREATED,
+)
+def attach_label_to_issue(
+    project_id: int,
+    issue_id: int,
+    label_in: IssueLabelAttach,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    issue = db.scalar(
+        select(Issue).where(
+            Issue.id == issue_id,
+            Issue.project_id == project_id,
+        )
+    )
+    if issue is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found",
+        )
+
+    membership = get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    require_project_write_access(membership)
+
+    label = db.scalar(
+        select(Label).where(
+            Label.id == label_in.label_id,
+            Label.project_id == project_id,
+        )
+    )
+    if label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found",
+        )
+
+    existing_issue_label = db.scalar(
+        select(IssueLabel).where(
+            IssueLabel.issue_id == issue_id,
+            IssueLabel.label_id == label_in.label_id,
+        )
+    )
+    if existing_issue_label is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Label is already attached to this issue",
+        )
+
+    issue_label = IssueLabel(
+        issue_id=issue_id,
+        label_id=label_in.label_id,
+    )
+
+    db.add(issue_label)
+
+    create_activity_log(
+        db,
+        project_id=project_id,
+        issue_id=issue_id,
+        actor_id=current_user.id,
+        action="label_attached_to_issue",
+        metadata_json={
+            "label_id": label.id,
+            "label_name": label.name,
+        },
+    )
+
+    db.commit()
+
+    return {"message": "Label attached successfully"}
+
+@router.get("/{project_id}/issues/{issue_id}/labels", response_model=list[LabelResponse])
+def list_issue_labels(
+    project_id: int,
+    issue_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    issue = db.scalar(
+        select(Issue).where(
+            Issue.id == issue_id,
+            Issue.project_id == project_id,
+        )
+    )
+    if issue is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Issue not found",
+        )
+
+    get_project_membership_or_403(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+
+    labels = db.scalars(
+        select(Label)
+        .join(IssueLabel, IssueLabel.label_id == Label.id)
+        .where(IssueLabel.issue_id == issue_id)
+        .order_by(Label.name.asc())
+    ).all()
+
+    return labels

@@ -12,6 +12,8 @@ from app.models.project_member import ProjectMember
 from app.models.issue import Issue
 from app.models.comment import Comment
 from app.models.activity_log import ActivityLog
+from app.models.label import Label
+from app.models.issue_label import IssueLabel
 
 config = context.config
 
