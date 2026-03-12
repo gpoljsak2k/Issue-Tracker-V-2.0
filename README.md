@@ -110,11 +110,18 @@ http://localhost:8000/docs
 docker compose exec web python -m scripts.seed_demo
 ```
 **Demo users:**
+<<<<<<< HEAD
 
 ```
 **username:**	**password:**
 owner	    OwnerPass1!
 admin	    AdminPass1!
+=======
+```
+username:	 password:
+owner	     OwnerPass1!
+admin	     AdminPass1!
+>>>>>>> 2ceb0caf819f8bfbf363520ca8b2fe1079ab31d3
 member	    MemberPass1!
 viewer	    ViewerPass1!
 ```
