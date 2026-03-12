@@ -14,16 +14,27 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Docker**, with aut
 * JWT authentication
 * Secure password hashing
 * Protected endpoints
+* Login rate limiting to prevent brute-force attacks
 
 ## Projects
 
-* Create and manage projects
+* Create projects
+* List projects where the user is a member
+* Get project details 
+* Delete project (owner only)
 * Role-based permissions:
 
   * `owner`
   * `admin`
   * `member`
   * `viewer`
+
+## Project Members
+
+* Add members to a project
+* Update member roles
+* Remove members from a project
+* Owner protection (owner cannot be removed or downgraded)
 
 ## Issues
 
@@ -34,8 +45,17 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Docker**, with aut
 ## Labels
 
 * Create labels per project
+* Update labels
+* Delete labels
 * Attach labels to issues
+* Remove labels from issues
 * Many-to-many relationship between issues and labels
+
+## Comments
+
+* Add comments to issues
+* Update comments
+* Delete comments
 
 ## Advanced Issue Listing
 
@@ -48,10 +68,20 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Docker**, with aut
 
 Tracks important events such as:
 
+* project created
 * issue created
 * issue updated
 * label created
 * label attached to issue
+* member role updated
+
+## Security
+
+* JWT authentication
+* Role-based access control
+* Password hashing
+* Login rate limiting
+* Protected endpoints
 
 ## Quality & Infrastructure
 
@@ -110,25 +140,144 @@ http://localhost:8000/docs
 docker compose exec web python -m scripts.seed_demo
 ```
 **Demo users:**
-<<<<<<< HEAD
 
-```
-**username:**	**password:**
-owner	    OwnerPass1!
-admin	    AdminPass1!
-=======
 ```
 username:	 password:
 owner	     OwnerPass1!
 admin	     AdminPass1!
->>>>>>> 2ceb0caf819f8bfbf363520ca8b2fe1079ab31d3
-member	    MemberPass1!
-viewer	    ViewerPass1!
-```
+member	     MemberPass1!
+viewer	     ViewerPass1!
+``` 
 
 Demo project key:
 - DEMO
 
+# Architecture
+
+The application follows a layered backend structure:
+
+```
+┌─────────────┐
+│   Client    │
+└──────┬──────┘
+       │---> API routers handle HTTP requests and responses
+       ▼
+┌─────────────┐
+│  FastAPI    │
+│   Routers   │
+└──────┬──────┘
+       │---> Schemas validate input and shape output
+       ▼
+┌─────────────┐
+│ Validation  │
+│ Permissions │
+└──────┬──────┘
+       │---> Permissions enforce role-based access control
+       ▼
+┌─────────────┐
+│  Services   │
+└──────┬──────┘
+       │---> Services contain reusable business logic
+       ▼
+┌─────────────┐
+│ SQLAlchemy  │
+│    ORM      │
+└──────┬──────┘
+       │---> SQLAlchemy models map application objects to the database
+       ▼
+┌─────────────┐
+│ PostgreSQL  │---> PostgreSQL stores all persistent data
+└─────────────┘
+```
+
+# API Examples
+
+## Create Project
+
+### Request
+
+```bash
+curl -X POST "http://localhost:8000/projects/" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Issue Tracker Demo",
+    "key": "DEMO",
+    "description": "Demo project with seeded data"
+  }'
+```
+### Response
+
+```bash
+{
+  "id": 1,
+  "name": "Issue Tracker Demo",
+  "key": "DEMO",
+  "description": "Demo project with seeded data",
+  "owner_id": 1
+}
+```
+## Create Issue
+
+```bash
+curl -X POST "http://localhost:8000/projects/1/issues" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Implement JWT login",
+    "description": "Add authentication and protected routes",
+    "status": "todo",
+    "priority": "high",
+    "assignee_id": 2
+  }'
+```
+### Response
+
+```bash
+{
+  "id": 1,
+  "title": "Implement JWT login",
+  "description": "Add authentication and protected routes",
+  "status": "todo",
+  "priority": "high",
+  "project_id": 1,
+  "reporter_id": 1,
+  "assignee_id": 2,
+  "created_at": "2026-03-12T10:00:00Z",
+  "updated_at": "2026-03-12T10:00:00Z"
+}
+```
+## List Issues with Filtering, Search and Pagination
+
+### Request
+
+```bash
+curl "http://localhost:8000/projects/1/issues?status=todo&search=jwt&sort_by=priority&order=desc&limit=20&offset=0" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+### Response
+
+```bash
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "Implement JWT login",
+      "description": "Add authentication and protected routes",
+      "status": "todo",
+      "priority": "high",
+      "project_id": 1,
+      "reporter_id": 1,
+      "assignee_id": 2,
+      "created_at": "2026-03-12T10:00:00Z",
+      "updated_at": "2026-03-12T10:00:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+```
 
 # Running Tests
 
@@ -191,7 +340,7 @@ docker         # postgres initialization
 * Project dashboard statistics
 * Full-text search using PostgreSQL
 * WebSocket notifications
-* Rate limiting
+* Email notifications
 * User invitations via email
 
 ---

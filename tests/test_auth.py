@@ -59,3 +59,28 @@ def test_read_current_user_success(client):
     data = response.json()
     assert data["username"] == "gasper"
     assert data["email"] == "gasper@example.com"
+
+def test_login_rate_limit_blocks_after_too_many_failed_attempts(client):
+    create_user(
+        client,
+        email="gasper@example.com",
+        username="gasper",
+        password="MojeGeslo1!",
+    )
+
+    for _ in range(5):
+        response = login_user(
+            client,
+            username="gasper",
+            password="WrongPass1!",
+        )
+        assert response.status_code == 401
+
+    blocked_response = login_user(
+        client,
+        username="gasper",
+        password="WrongPass1!",
+    )
+
+    assert blocked_response.status_code == 429
+    assert blocked_response.json()["detail"] == "Too many login attempts. Please try again later."

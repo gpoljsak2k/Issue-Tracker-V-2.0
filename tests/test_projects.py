@@ -1,4 +1,4 @@
-from tests.utils import create_user, get_auth_headers, create_project
+from tests.utils import create_user, get_auth_headers, create_project, add_project_member
 
 
 def test_create_project_success(client):
@@ -160,3 +160,44 @@ def test_user_cannot_get_project_if_not_member(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions for this project"
+
+def test_owner_can_delete_project(client):
+    create_user(client, "owner@example.com", "owner", "OwnerPass1!")
+
+    headers = get_auth_headers(client, "owner", "OwnerPass1!")
+
+    project = create_project(client, headers, key="DEL1")
+    project_id = project.json()["id"]
+
+    response = client.delete(
+        f"/projects/{project_id}",
+        headers=headers,
+    )
+
+    assert response.status_code == 204
+
+    get_response = client.get(
+        f"/projects/{project_id}",
+        headers=headers,
+    )
+
+    assert get_response.status_code == 404
+
+def test_member_cannot_delete_project(client):
+    create_user(client, "owner@example.com", "owner", "OwnerPass1!")
+    create_user(client, "member@example.com", "member", "MemberPass1!")
+
+    owner_headers = get_auth_headers(client, "owner", "OwnerPass1!")
+    member_headers = get_auth_headers(client, "member", "MemberPass1!")
+
+    project = create_project(client, owner_headers, key="DEL2")
+    project_id = project.json()["id"]
+
+    add_project_member(client, project_id, 2, "member", owner_headers)
+
+    response = client.delete(
+        f"/projects/{project_id}",
+        headers=member_headers,
+    )
+
+    assert response.status_code == 403

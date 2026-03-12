@@ -8,6 +8,7 @@ from alembic import command
 from app.core.config import settings
 from app.db.session import get_db
 from app.main import app
+from app.core.rate_limit import login_rate_limiter
 
 test_engine = create_engine(settings.TEST_DATABASE_URL, echo=False)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
@@ -30,6 +31,7 @@ def reset_database():
 def db_session():
     reset_database()
     run_migrations()
+    login_rate_limiter.attempts.clear()
 
     db = TestingSessionLocal()
     try:

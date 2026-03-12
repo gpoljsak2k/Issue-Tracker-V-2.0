@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, or_, case, func
+from sqlalchemy import select, or_, case, func, delete
 from sqlalchemy.orm import Session
+
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
@@ -11,6 +12,11 @@ from app.schemas.project import ProjectCreate, ProjectResponse
 from app.core.permissions import get_project_membership_or_403
 from app.models.activity_log import ActivityLog
 from app.schemas.activity_log import ActivityLogResponse
+from app.models.issue import Issue
+from app.models.comment import Comment
+from app.models.label import Label
+from app.models.issue_label import IssueLabel
+
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -87,32 +93,66 @@ def get_project(
 
     return project
 
-@router.get("/{project_id}/activity", response_model=list[ActivityLogResponse])
-def list_project_activity(
+@router.delete(
+    "/{project_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    project = db.scalar(select(Project).where(Project.id == project_id))
+    project = db.scalar(
+        select(Project).where(Project.id == project_id)
+    )
+
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
 
-    get_project_membership_or_403(
+    membership = get_project_membership_or_403(
         db=db,
         project_id=project_id,
         user_id=current_user.id,
     )
 
-    logs = db.scalars(
-        select(ActivityLog)
-        .where(ActivityLog.project_id == project_id)
-        .order_by(ActivityLog.created_at.desc())
+    if membership.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only project owner can delete the project",
+        )
+
+    issue_ids = db.scalars(
+        select(Issue.id).where(Issue.project_id == project_id)
     ).all()
 
-    return logs
+    if issue_ids:
+        db.execute(
+            delete(Comment).where(Comment.issue_id.in_(issue_ids))
+        )
+        db.execute(
+            delete(IssueLabel).where(IssueLabel.issue_id.in_(issue_ids))
+        )
+
+    db.execute(
+        delete(ActivityLog).where(ActivityLog.project_id == project_id)
+    )
+    db.execute(
+        delete(ProjectMember).where(ProjectMember.project_id == project_id)
+    )
+    db.execute(
+        delete(Issue).where(Issue.project_id == project_id)
+    )
+    db.execute(
+        delete(Label).where(Label.project_id == project_id)
+    )
+    db.execute(
+        delete(Project).where(Project.id == project_id)
+    )
+
+    db.commit()
 
 
 

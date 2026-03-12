@@ -10,6 +10,7 @@ from app.api.issues import router as issues_router
 from app.api.labels import router as labels_router
 from app.api.memberships import router as memberships_router
 from app.api.comments import router as comments_router
+from app.api.project_activity import router as project_activity_router
 
 app = FastAPI(title="Issue Tracker API")
 
@@ -20,10 +21,10 @@ app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(memberships_router)
 app.include_router(projects_router)
+app.include_router(project_activity_router)
 app.include_router(issues_router)
 app.include_router(labels_router)
 app.include_router(comments_router)
-
 
 
 @app.get("/")
