@@ -1,164 +1,163 @@
-import api from "../api/client";
 import { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import api from "../api/client";
 
-function LoginForm({ onLoginSuccess }) {
+function LoginForm({ onLoginSuccess, onShowRegister }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
 
-    async function handleSubmit(e) {
-      e.preventDefault();
-      setError("");
-
-      try {
-        const response = await api.post("/auth/login", {
-          username,
-          password,
-        });
-
-        const token = response.data.access_token;
-        // ostala logika
-      } catch (error) {
-        setError("Could not connect to backend.");
-      }
-    }
+    try {
+      const response = await api.post("/auth/login", {
+        username,
+        password,
+      });
 
       onLoginSuccess(response.data.access_token);
     } catch (err) {
       console.error(err);
-
-      if (err.response) {
-        setError(err.response.data?.detail || "Login failed.");
-      } else {
-        setError("Could not connect to backend.");
-      }
-    } finally {
-      setLoading(false);
+      setError("Could not connect to backend.");
     }
   }
 
   return (
     <div
       style={{
-        maxWidth: "400px",
-        margin: "80px auto",
-        background: "white",
+        maxWidth: "420px",
+        margin: "60px auto",
         padding: "24px",
-        borderRadius: "12px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+        background: "white",
+        borderRadius: "16px",
+        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+        border: "1px solid #e2e8f0",
       }}
     >
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "28px",
-              fontWeight: "700",
-              color: "#0f172a",
-            }}
-          >
-            Issue Tracker V-2.0
-          </h1>
-          <p
-            style={{
-              marginTop: "8px",
-              marginBottom: 0,
-              color: "#64748b",
-              fontSize: "14px",
-            }}
-          >
-            Sign in to manage projects and issues
-          </p>
-        </div>
+      <h1
+        style={{
+          textAlign: "center",
+          marginTop: 0,
+          marginBottom: "8px",
+          color: "#0f172a",
+        }}
+      >
+        Issue Tracker V-2.0
+      </h1>
 
-        <h2 style={{ marginBottom: "16px", fontSize: "20px" }}>Login</h2>
+      <p
+        style={{
+          textAlign: "center",
+          marginTop: 0,
+          marginBottom: "28px",
+          color: "#64748b",
+        }}
+      >
+        Sign in to manage projects and issues
+      </p>
+
+      <h2 style={{ marginBottom: "20px", color: "#0f172a" }}>Login</h2>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: "12px" }}>
-          <label style={{ display: "block", marginBottom: "6px" }}>
-            Username
-          </label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              boxSizing: "border-box",
-              borderRadius: "8px",
-              border: "1px solid #cbd5e1",
-              fontSize: "14px",
-            }}
-          />
-        </div>
+        <label
+          htmlFor="username"
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontWeight: "600",
+            color: "#0f172a",
+          }}
+        >
+          Username
+        </label>
+        <input
+          id="username"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "12px 14px",
+            marginBottom: "16px",
+            border: "1px solid #cbd5e1",
+            borderRadius: "10px",
+            fontSize: "16px",
+          }}
+        />
 
-        <div style={{ marginBottom: "12px" }}>
-          <label style={{ display: "block", marginBottom: "6px" }}>
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              boxSizing: "border-box",
-              borderRadius: "8px",
-              border: "1px solid #cbd5e1",
-              fontSize: "14px",
-            }}
-          />
-        </div>
+        <label
+          htmlFor="password"
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontWeight: "600",
+            color: "#0f172a",
+          }}
+        >
+          Password
+        </label>
+        <input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "12px 14px",
+            marginBottom: "16px",
+            border: "1px solid #cbd5e1",
+            borderRadius: "10px",
+            fontSize: "16px",
+          }}
+        />
 
         <button
           type="submit"
-          disabled={loading}
           style={{
             width: "100%",
-            padding: "10px 12px",
-            borderRadius: "8px",
-            border: "none",
+            padding: "12px",
             background: "#0f172a",
             color: "white",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "16px",
+            fontWeight: "600",
             cursor: "pointer",
+            marginBottom: "16px",
           }}
         >
-          {loading ? "Logging in..." : "Login"}
+          Login
         </button>
       </form>
 
-        <p style={{ marginTop: "16px", fontSize: "14px", color: "#475569" }}>
-          Don&apos;t have an account?{" "}
-          <button
-            type="button"
-            onClick={() => navigate("/register")}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#2563eb",
-              cursor: "pointer",
-              padding: 0,
-              fontSize: "14px",
-            }}
-          >
-            Create one
-          </button>
-        </p>
+      <p style={{ margin: 0, color: "#475569" }}>
+        Don't have an account?{" "}
+        <button
+          type="button"
+          onClick={onShowRegister}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#2563eb",
+            cursor: "pointer",
+            padding: 0,
+            fontSize: "inherit",
+          }}
+        >
+          Create one
+        </button>
+      </p>
 
-      {error && (
-        <p style={{ color: "crimson", marginTop: "12px" }}>{error}</p>
-      )}
+      {error ? (
+        <p style={{ color: "crimson", marginTop: "16px", marginBottom: 0 }}>
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
