@@ -16,7 +16,7 @@ def test_member_can_create_label(client):
     project_response = create_project(client, owner_headers, key="LAB1")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.post(
         f"/projects/{project_id}/labels",
@@ -33,6 +33,7 @@ def test_member_can_create_label(client):
     assert data["name"] == "backend"
     assert data["color"] == "#FF5733"
 
+
 def test_viewer_cannot_create_label(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "viewer@example.com", "viewer", "ViewerPass1!")
@@ -43,7 +44,7 @@ def test_viewer_cannot_create_label(client):
     project_response = create_project(client, owner_headers, key="LAB2")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "viewer", owner_headers)
+    add_project_member(client, project_id, "viewer", "viewer", owner_headers)
 
     response = client.post(
         f"/projects/{project_id}/labels",
@@ -56,6 +57,7 @@ def test_viewer_cannot_create_label(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions for this action"
+
 
 def test_can_attach_label_to_issue(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -105,6 +107,7 @@ def test_can_attach_label_to_issue(client):
     assert len(labels) == 1
     assert labels[0]["name"] == "enhancement"
 
+
 def test_cannot_attach_same_label_twice(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     owner_headers = get_auth_headers(client, "owner", "OwnerPass1!")
@@ -151,6 +154,7 @@ def test_cannot_attach_same_label_twice(client):
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "Label is already attached to this issue"
 
+
 def test_can_update_label(client):
     create_user(client, "owner@example.com", "owner", "Ownerpass1!")
     owner_headers = get_auth_headers(client, "owner", "Ownerpass1!")
@@ -182,6 +186,7 @@ def test_can_update_label(client):
     assert data["name"] == "api"
     assert data["color"] == "#00AAFF"
 
+
 def test_cannot_update_label_to_duplicate_name(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     owner_headers = get_auth_headers(client, "owner", "OwnerPass1!")
@@ -208,10 +213,11 @@ def test_cannot_update_label_to_duplicate_name(client):
         headers=owner_headers,
     )
 
-    assert first_label.status_code ==201
+    assert first_label.status_code == 201
     assert second_label.status_code == 201
     assert response.status_code == 409
     assert response.json()["detail"] == "Label name already exists in this project"
+
 
 def test_can_delete_label(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -244,6 +250,7 @@ def test_can_delete_label(client):
 
     assert list_response.status_code == 200
     assert list_response.json() == []
+
 
 def test_can_remove_label_from_issue(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -296,6 +303,7 @@ def test_can_remove_label_from_issue(client):
     assert list_response.status_code == 200
     assert list_response.json() == []
 
+
 def test_invalid_label_color_returns_422(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     owner_headers = get_auth_headers(client, "owner", "OwnerPass1!")
@@ -313,6 +321,7 @@ def test_invalid_label_color_returns_422(client):
     )
 
     assert response.status_code == 422
+
 
 def test_invalid_label_color_returns_standardized_validation_error(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -335,6 +344,7 @@ def test_invalid_label_color_returns_standardized_validation_error(client):
     assert data["error"] == "validation_error"
     assert "color" in data["detail"]
 
+
 def test_project_not_found_returns_standardized_http_error(client):
     create_user(client, "user@example.com", "user", "UserPass1!")
     headers = get_auth_headers(client, "user", "UserPass1!")
@@ -345,4 +355,3 @@ def test_project_not_found_returns_standardized_http_error(client):
     data = response.json()
     assert data["error"] == "http_error"
     assert data["detail"] == "Project not found"
-

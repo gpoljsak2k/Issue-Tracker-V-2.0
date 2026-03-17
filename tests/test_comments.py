@@ -18,8 +18,8 @@ def setup_project_with_issue(client):
     project_response = create_project(client, owner_headers, key="COM1")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
-    add_project_member(client, project_id, 3, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
+    add_project_member(client, project_id, "other", "member", owner_headers)
 
     issue_response = client.post(
         f"/projects/{project_id}/issues",
@@ -36,6 +36,7 @@ def setup_project_with_issue(client):
 
     return project_id, issue_id, owner_headers, member_headers, other_headers
 
+
 def test_member_can_create_comment(client):
     project_id, issue_id, owner_headers, member_headers, _ = setup_project_with_issue(client)
 
@@ -51,6 +52,7 @@ def test_member_can_create_comment(client):
     assert data["author_id"] == 2
     assert data["body"] == "I am working on this issue now."
 
+
 def test_viewer_cannot_create_comment(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "viewer@example.com", "viewer", "ViewerPass1!")
@@ -61,7 +63,7 @@ def test_viewer_cannot_create_comment(client):
     project_response = create_project(client, owner_headers, key="COM2")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "viewer", owner_headers)
+    add_project_member(client, project_id, "viewer", "viewer", owner_headers)
 
     issue_response = client.post(
         f"/projects/{project_id}/issues",
@@ -85,6 +87,7 @@ def test_viewer_cannot_create_comment(client):
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions for this action"
 
+
 def test_member_cannot_update_other_users_comment(client):
     project_id, issue_id, owner_headers, member_headers, other_headers = setup_project_with_issue(client)
 
@@ -103,6 +106,7 @@ def test_member_cannot_update_other_users_comment(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions to update this comment"
+
 
 def test_owner_can_update_other_users_comment(client):
     project_id, issue_id, owner_headers, member_headers, _ = setup_project_with_issue(client)
@@ -123,6 +127,7 @@ def test_owner_can_update_other_users_comment(client):
     assert response.status_code == 200
     assert response.json()["body"] == "Owner edited comment"
 
+
 def test_comment_author_can_delete_comment(client):
     project_id, issue_id, _, member_headers, _ = setup_project_with_issue(client)
 
@@ -139,4 +144,3 @@ def test_comment_author_can_delete_comment(client):
     )
 
     assert response.status_code == 204
-

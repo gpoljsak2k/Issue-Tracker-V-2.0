@@ -31,7 +31,7 @@ def test_owner_can_add_project_member(client):
     add_member_response = client.post(
         f"/projects/{project_id}/members",
         json={
-            "user_id": 2,
+            "username": "member",
             "role": "member",
         },
         headers=owner_headers,
@@ -42,6 +42,7 @@ def test_owner_can_add_project_member(client):
     assert data["project_id"] == project_id
     assert data["user_id"] == 2
     assert data["role"] == "member"
+
 
 def test_cannot_add_same_member_twice(client):
     create_user(
@@ -72,19 +73,20 @@ def test_cannot_add_same_member_twice(client):
 
     first_response = client.post(
         f"/projects/{project_id}/members",
-        json={"user_id": 2, "role": "member"},
+        json={"username": "member", "role": "member"},
         headers=owner_headers,
     )
 
     second_response = client.post(
         f"/projects/{project_id}/members",
-        json={"user_id": 2, "role": "member"},
+        json={"username": "member", "role": "member"},
         headers=owner_headers,
     )
 
     assert first_response.status_code == 201
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "User is already a member of this project"
+
 
 def test_member_cannot_add_project_member(client):
     create_user(
@@ -122,18 +124,19 @@ def test_member_cannot_add_project_member(client):
 
     client.post(
         f"/projects/{project_id}/members",
-        json={"user_id": 2, "role": "member"},
+        json={"username": "member", "role": "member"},
         headers=owner_headers,
     )
 
     forbidden_response = client.post(
         f"/projects/{project_id}/members",
-        json={"user_id": 3, "role": "member"},
+        json={"username": "other", "role": "member"},
         headers=member_headers,
     )
 
     assert forbidden_response.status_code == 403
     assert forbidden_response.json()["detail"] == "Not enough permissions for this action"
+
 
 def test_non_member_cannot_list_project_members(client):
     create_user(
@@ -171,6 +174,7 @@ def test_non_member_cannot_list_project_members(client):
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions for this project"
 
+
 def test_owner_can_update_project_member_role(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "member@example.com", "member", "MemberPass1!")
@@ -180,7 +184,7 @@ def test_owner_can_update_project_member_role(client):
     create_project_response = create_project(client, owner_headers, key="MEM1")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.patch(
         f"/projects/{project_id}/members/2",
@@ -193,6 +197,7 @@ def test_owner_can_update_project_member_role(client):
     assert data["user_id"] == 2
     assert data["role"] == "admin"
 
+
 def test_member_cannot_update_project_member_role(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "member@example.com", "member", "MemberPass1!")
@@ -204,8 +209,8 @@ def test_member_cannot_update_project_member_role(client):
     create_project_response = create_project(client, owner_headers, key="MEM2")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
-    add_project_member(client, project_id, 3, "viewer", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
+    add_project_member(client, project_id, "other", "viewer", owner_headers)
 
     response = client.patch(
         f"/projects/{project_id}/members/3",
@@ -215,6 +220,7 @@ def test_member_cannot_update_project_member_role(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Not enough permissions for this action"
+
 
 def test_cannot_change_owner_role(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -226,7 +232,7 @@ def test_cannot_change_owner_role(client):
     create_project_response = create_project(client, owner_headers, key="MEM3")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "admin", owner_headers)
+    add_project_member(client, project_id, "admin", "admin", owner_headers)
 
     response = client.patch(
         f"/projects/{project_id}/members/1",
@@ -237,6 +243,7 @@ def test_cannot_change_owner_role(client):
     assert response.status_code == 403
     assert response.json()["detail"] == "Owner role cannot be changed"
 
+
 def test_owner_can_remove_project_member(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "member@example.com", "member", "MemberPass1!")
@@ -246,7 +253,7 @@ def test_owner_can_remove_project_member(client):
     create_project_response = create_project(client, owner_headers, key="MEM4")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.delete(
         f"/projects/{project_id}/members/2",
@@ -265,6 +272,7 @@ def test_owner_can_remove_project_member(client):
     assert members[0]["user_id"] == 1
     assert members[0]["role"] == "owner"
 
+
 def test_cannot_remove_owner_from_project(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
     create_user(client, "admin@example.com", "admin", "AdminPass1!")
@@ -275,7 +283,7 @@ def test_cannot_remove_owner_from_project(client):
     create_project_response = create_project(client, owner_headers, key="MEM5")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "admin", owner_headers)
+    add_project_member(client, project_id, "admin", "admin", owner_headers)
 
     response = client.delete(
         f"/projects/{project_id}/members/1",
@@ -284,6 +292,7 @@ def test_cannot_remove_owner_from_project(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Owner cannot be removed from the project"
+
 
 def test_non_member_cannot_remove_project_member(client):
     create_user(client, "owner@example.com", "owner", "OwnerPass1!")
@@ -296,7 +305,7 @@ def test_non_member_cannot_remove_project_member(client):
     create_project_response = create_project(client, owner_headers, key="MEM6")
     project_id = create_project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.delete(
         f"/projects/{project_id}/members/2",

@@ -25,7 +25,13 @@ def get_auth_headers(client, username, password):
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_project(client, headers, name="Issue Tracker Backend", key="ITB", description="Backend API project"):
+def create_project(
+    client,
+    headers,
+    name="Issue Tracker Backend",
+    key="ITB",
+    description="Backend API project",
+):
     return client.post(
         "/projects/",
         json={
@@ -37,11 +43,11 @@ def create_project(client, headers, name="Issue Tracker Backend", key="ITB", des
     )
 
 
-def add_project_member(client, project_id, user_id, role, headers):
+def add_project_member(client, project_id, username, role, headers):
     return client.post(
         f"/projects/{project_id}/members",
         json={
-            "user_id": user_id,
+            "username": username,
             "role": role,
         },
         headers=headers,

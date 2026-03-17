@@ -16,7 +16,7 @@ def test_member_can_create_issue(client):
     project_response = create_project(client, owner_headers, key="ISS1")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.post(
         f"/projects/{project_id}/issues",
@@ -49,7 +49,7 @@ def test_cannot_assign_issue_to_non_member(client):
     project_response = create_project(client, owner_headers, key="ISS2")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     response = client.post(
         f"/projects/{project_id}/issues",
@@ -77,7 +77,7 @@ def test_viewer_cannot_create_issue(client):
     project_response = create_project(client, owner_headers, key="ISS3")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "viewer", owner_headers)
+    add_project_member(client, project_id, "viewer", "viewer", owner_headers)
 
     response = client.post(
         f"/projects/{project_id}/issues",
@@ -105,7 +105,7 @@ def test_member_cannot_delete_issue(client):
     project_response = create_project(client, owner_headers, key="ISS4")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     issue_response = client.post(
         f"/projects/{project_id}/issues",
@@ -256,7 +256,7 @@ def test_list_issues_can_filter_by_assignee(client):
     project_response = create_project(client, owner_headers, key="FIL3")
     project_id = project_response.json()["id"]
 
-    add_project_member(client, project_id, 2, "member", owner_headers)
+    add_project_member(client, project_id, "member", "member", owner_headers)
 
     client.post(
         f"/projects/{project_id}/issues",
