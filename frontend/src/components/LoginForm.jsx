@@ -11,15 +11,27 @@ function LoginForm({ onLoginSuccess, onShowRegister }) {
     setError("");
 
     try {
-      const response = await api.post("/auth/login", {
-        username,
-        password,
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      const response = await api.post("/auth/login", formData, {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       });
 
       onLoginSuccess(response.data.access_token);
     } catch (err) {
       console.error(err);
-      setError("Could not connect to backend.");
+
+      if (err.response?.status === 401) {
+        setError("Invalid username or password.");
+      } else if (err.response?.status === 422) {
+        setError("Login request format is invalid.");
+      } else {
+        setError("Could not connect to backend.");
+      }
     }
   }
 
@@ -71,6 +83,7 @@ function LoginForm({ onLoginSuccess, onShowRegister }) {
         >
           Username
         </label>
+
         <input
           id="username"
           type="text"
@@ -99,6 +112,7 @@ function LoginForm({ onLoginSuccess, onShowRegister }) {
         >
           Password
         </label>
+
         <input
           id="password"
           type="password"
