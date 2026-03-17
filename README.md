@@ -66,14 +66,12 @@ Built with **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and **Docker**, with aut
 
 ## Activity Log
 
-Tracks important events such as:
-
-* project created
-* issue created
-* issue updated
-* label created
-* label attached to issue
-* member role updated
+Tracks:
+* issue changes
+* comments
+* member changes
+* labels
+* project actions
 
 ## Security
 
@@ -83,35 +81,49 @@ Tracks important events such as:
 * Login rate limiting
 * Protected endpoints
 
-## Quality & Infrastructure
-
-* PostgreSQL database
-* Alembic migrations
-* Pytest test suite
-* Docker development environment
-* GitHub Actions CI pipeline
-
 ---
 
 # Tech Stack
 
-* **FastAPI**
-* **PostgreSQL**
-* **SQLAlchemy 2.0**
-* **Alembic**
-* **Docker**
-* **Pytest**
-* **GitHub Actions**
+## Backend
+- **FastAPI**
+- **SQLAlchemy 2.0**
+- **PostgreSQL**
+- **Alembic**
+- **JWT Authentication**
+- **Pytest**
+
+## Frontend
+- **React**
+- **Vite**
+- **Axios**
+
+## DevOps
+- **Docker**
+- **Render (Web Service + Static Site + Postgres)**
+- **GitHub Actions CI**
 
 ---
 
+# Deployment
+
+The app is fully deployed using **Render**:
+
+- Backend → Web Service (Docker)
+- Frontend → Static Site
+- Database → PostgreSQL
+
+## ⚠️ Important
+Render free Postgres database expires after **30 days**, so this deployment is intended for demo purposes.
+
+---
 # Installation
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/issue-tracker-api.git
-cd issue-tracker-api
+git clone https://github.com/gpoljsak2k/Issue-Tracker-V-2.0.git
+cd Issue-Tracker-V-2.0
 ```
 
 Start services:
@@ -130,6 +142,15 @@ Open API documentation:
 
 ```
 http://localhost:8000/docs
+```
+
+---
+
+Frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
@@ -338,12 +359,12 @@ docker         # postgres initialization
 
 # Possible Improvements
 
-* Label filtering for issues
-* Project dashboard statistics
-* Full-text search using PostgreSQL
-* WebSocket notifications
-* Email notifications
-* User invitations via email
+* Refresh tokens
+* Notifications
+* Dashboard analytics
+* Full-text search
+* File attachments
+* Email invites
 
 ---
 
