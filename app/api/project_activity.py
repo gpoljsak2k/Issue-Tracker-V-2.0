@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, or_, case, func, delete
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 
 from app.api.deps import get_current_user
@@ -35,6 +35,7 @@ def list_project_activity(
 
     logs = db.scalars(
         select(ActivityLog)
+        .options(selectinload(ActivityLog.actor))
         .where(ActivityLog.project_id == project_id)
         .order_by(ActivityLog.created_at.desc())
     ).all()

@@ -219,6 +219,8 @@ curl -X POST "http://localhost:8000/projects/" \
 ```
 ## Create Issue
 
+### Request
+
 ```bash
 curl -X POST "http://localhost:8000/projects/1/issues" \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \

@@ -1,231 +1,246 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.models.user import User
+from app.models.activity_log import ActivityLog
+from app.models.comment import Comment
+from app.models.issue import Issue
+from app.models.issue_label import IssueLabel
+from app.models.label import Label
 from app.models.project import Project
 from app.models.project_member import ProjectMember
-from app.models.issue import Issue
-from app.models.label import Label
-from app.models.issue_label import IssueLabel
+from app.models.user import User
 
 
-def get_or_create_user(db, *, email: str, username: str, password: str) -> User:
-    user = db.scalar(select(User).where(User.email == email))
-    if user:
-        return user
+def reset_database(db):
+    # Delete in dependency order
+    db.execute(delete(Comment))
+    db.execute(delete(IssueLabel))
+    db.execute(delete(ActivityLog))
+    db.execute(delete(Issue))
+    db.execute(delete(Label))
+    db.execute(delete(ProjectMember))
+    db.execute(delete(Project))
+    db.execute(delete(User))
+    db.commit()
 
-    user = User(
-        email=email,
-        username=username,
-        hashed_password=hash_password(password),
+
+def seed_users(db):
+    admin = User(
+        email="admin@example.com",
+        username="admin",
+        hashed_password=hash_password("Admin123!"),
         is_active=True,
     )
-    db.add(user)
+    ana = User(
+        email="ana@example.com",
+        username="ana",
+        hashed_password=hash_password("Ana12345!"),
+        is_active=True,
+    )
+    matej = User(
+        email="matej@example.com",
+        username="matej",
+        hashed_password=hash_password("Matej123!"),
+        is_active=True,
+    )
+
+    db.add_all([admin, ana, matej])
     db.commit()
-    db.refresh(user)
-    return user
+
+    for user in [admin, ana, matej]:
+        db.refresh(user)
+
+    return admin, ana, matej
 
 
-def get_or_create_project(db, *, name: str, key: str, description: str | None, owner_id: int) -> Project:
-    project = db.scalar(select(Project).where(Project.key == key))
-    if project:
-        return project
-
+def seed_project(db, owner):
     project = Project(
-        name=name,
-        key=key,
-        description=description,
-        owner_id=owner_id,
+        name="Issue Tracker Demo",
+        key="DEMO",
+        description="Demo project for presentation",
+        owner_id=owner.id,
     )
     db.add(project)
+    db.flush()
+
+    owner_membership = ProjectMember(
+        project_id=project.id,
+        user_id=owner.id,
+        role="owner",
+    )
+    db.add(owner_membership)
+
     db.commit()
     db.refresh(project)
     return project
 
 
-def get_or_create_membership(db, *, project_id: int, user_id: int, role: str) -> ProjectMember:
-    membership = db.scalar(
-        select(ProjectMember).where(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user_id,
-        )
-    )
-    if membership:
-        return membership
-
-    membership = ProjectMember(
-        project_id=project_id,
-        user_id=user_id,
-        role=role,
-    )
-    db.add(membership)
+def seed_members(db, project, ana, matej):
+    members = [
+        ProjectMember(project_id=project.id, user_id=ana.id, role="admin"),
+        ProjectMember(project_id=project.id, user_id=matej.id, role="member"),
+    ]
+    db.add_all(members)
     db.commit()
-    db.refresh(membership)
-    return membership
 
 
-def get_or_create_label(db, *, project_id: int, name: str, color: str) -> Label:
-    label = db.scalar(
-        select(Label).where(
-            Label.project_id == project_id,
-            Label.name == name,
-        )
-    )
-    if label:
-        return label
-
-    label = Label(
-        project_id=project_id,
-        name=name,
-        color=color,
-    )
-    db.add(label)
+def seed_labels(db, project):
+    labels = [
+        Label(project_id=project.id, name="backend", color="#dbeafe"),
+        Label(project_id=project.id, name="frontend", color="#fef3c7"),
+        Label(project_id=project.id, name="bug", color="#fee2e2"),
+        Label(project_id=project.id, name="urgent", color="#fecaca"),
+    ]
+    db.add_all(labels)
     db.commit()
-    db.refresh(label)
-    return label
+
+    for label in labels:
+        db.refresh(label)
+
+    return labels
 
 
-def get_or_create_issue(
-    db,
-    *,
-    project_id: int,
-    title: str,
-    description: str,
-    status: str,
-    priority: str,
-    reporter_id: int,
-    assignee_id: int | None,
-) -> Issue:
-    issue = db.scalar(
-        select(Issue).where(
-            Issue.project_id == project_id,
-            Issue.title == title,
-        )
-    )
-    if issue:
-        return issue
+def seed_issues(db, project, admin, ana, matej):
+    issues = [
+        Issue(
+            project_id=project.id,
+            title="Add pagination metadata",
+            description="Expose total, limit and offset in the issues response.",
+            status="todo",
+            priority="high",
+            reporter_id=admin.id,
+            assignee_id=matej.id,
+        ),
+        Issue(
+            project_id=project.id,
+            title="Improve login page styling",
+            description="Add app title and improve spacing on the login form.",
+            status="in_progress",
+            priority="medium",
+            reporter_id=admin.id,
+            assignee_id=ana.id,
+        ),
+        Issue(
+            project_id=project.id,
+            title="Fix issue labels UI",
+            description="Make sure labels can be added and removed from the issue details panel.",
+            status="in_review",
+            priority="high",
+            reporter_id=ana.id,
+            assignee_id=admin.id,
+        ),
+        Issue(
+            project_id=project.id,
+            title="Prepare demo data",
+            description="Seed realistic demo users, project, issues and comments.",
+            status="done",
+            priority="urgent",
+            reporter_id=admin.id,
+            assignee_id=admin.id,
+        ),
+        Issue(
+            project_id=project.id,
+            title="Add project activity panel",
+            description="Show recent project activity below the issues list.",
+            status="blocked",
+            priority="medium",
+            reporter_id=matej.id,
+            assignee_id=None,
+        ),
+    ]
 
-    issue = Issue(
-        project_id=project_id,
-        title=title,
-        description=description,
-        status=status,
-        priority=priority,
-        reporter_id=reporter_id,
-        assignee_id=assignee_id,
-    )
-    db.add(issue)
+    db.add_all(issues)
     db.commit()
-    db.refresh(issue)
-    return issue
+
+    for issue in issues:
+        db.refresh(issue)
+
+    return issues
 
 
-def attach_label_if_missing(db, *, issue_id: int, label_id: int) -> None:
-    existing = db.scalar(
-        select(IssueLabel).where(
-            IssueLabel.issue_id == issue_id,
-            IssueLabel.label_id == label_id,
-        )
-    )
-    if existing:
-        return
+def seed_issue_labels(db, issues, labels):
+    label_by_name = {label.name: label for label in labels}
 
-    issue_label = IssueLabel(issue_id=issue_id, label_id=label_id)
-    db.add(issue_label)
+    mappings = [
+        (issues[0], ["backend"]),
+        (issues[1], ["frontend"]),
+        (issues[2], ["frontend", "bug"]),
+        (issues[3], ["urgent"]),
+        (issues[4], ["backend", "bug"]),
+    ]
+
+    rows = []
+    for issue, names in mappings:
+        for name in names:
+            label = label_by_name.get(name)
+            if label:
+                rows.append(IssueLabel(issue_id=issue.id, label_id=label.id))
+
+    db.add_all(rows)
+    db.commit()
+
+def seed_comments(db, issues, admin, ana, matej):
+    comments = [
+        Comment(
+            issue_id=issues[0].id,
+            author_id=admin.id,
+            body="We should keep this response consistent with project activity pagination later.",
+        ),
+        Comment(
+            issue_id=issues[0].id,
+            author_id=matej.id,
+            body="I can take this one after the labels work is finished.",
+        ),
+        Comment(
+            issue_id=issues[1].id,
+            author_id=ana.id,
+            body="I already improved the login title, just polishing the spacing now.",
+        ),
+        Comment(
+            issue_id=issues[3].id,
+            author_id=admin.id,
+            body="This issue is here mainly so the demo has at least one completed task.",
+        ),
+    ]
+
+    db.add_all(comments)
     db.commit()
 
 
 def main():
     db = SessionLocal()
     try:
-        owner = get_or_create_user(
-            db,
-            email="owner@example.com",
-            username="owner",
-            password="OwnerPass1!",
-        )
-        admin = get_or_create_user(
-            db,
-            email="admin@example.com",
-            username="admin",
-            password="AdminPass1!",
-        )
-        member = get_or_create_user(
-            db,
-            email="member@example.com",
-            username="member",
-            password="MemberPass1!",
-        )
-        viewer = get_or_create_user(
-            db,
-            email="viewer@example.com",
-            username="viewer",
-            password="ViewerPass1!",
-        )
+        print("Resetting database...")
+        reset_database(db)
 
-        project = get_or_create_project(
-            db,
-            name="Issue Tracker Demo",
-            key="DEMO",
-            description="Demo project with seeded users, issues and labels",
-            owner_id=owner.id,
-        )
+        print("Creating demo users...")
+        admin, ana, matej = seed_users(db)
 
-        get_or_create_membership(db, project_id=project.id, user_id=owner.id, role="owner")
-        get_or_create_membership(db, project_id=project.id, user_id=admin.id, role="admin")
-        get_or_create_membership(db, project_id=project.id, user_id=member.id, role="member")
-        get_or_create_membership(db, project_id=project.id, user_id=viewer.id, role="viewer")
+        print("Creating demo project...")
+        project = seed_project(db, admin)
 
-        bug_label = get_or_create_label(db, project_id=project.id, name="bug", color="#FF0000")
-        backend_label = get_or_create_label(db, project_id=project.id, name="backend", color="#1D4ED8")
-        auth_label = get_or_create_label(db, project_id=project.id, name="auth", color="#7C3AED")
+        print("Creating project members...")
+        seed_members(db, project, ana, matej)
 
-        issue1 = get_or_create_issue(
-            db,
-            project_id=project.id,
-            title="Implement JWT login",
-            description="Add authentication and protected routes",
-            status="in_progress",
-            priority="high",
-            reporter_id=owner.id,
-            assignee_id=member.id,
-        )
+        print("Creating labels...")
+        labels = seed_labels(db, project)
 
-        issue2 = get_or_create_issue(
-            db,
-            project_id=project.id,
-            title="Fix label validation",
-            description="Ensure hex color validation works correctly",
-            status="todo",
-            priority="medium",
-            reporter_id=admin.id,
-            assignee_id=member.id,
-        )
+        print("Creating issues...")
+        issues = seed_issues(db, project, admin, ana, matej)
 
-        issue3 = get_or_create_issue(
-            db,
-            project_id=project.id,
-            title="Add pagination metadata",
-            description="Return total, limit and offset in issue listing endpoint",
-            status="done",
-            priority="low",
-            reporter_id=owner.id,
-            assignee_id=admin.id,
-        )
+        print("Attaching labels to issues...")
+        seed_issue_labels(db, issues, labels)
 
-        attach_label_if_missing(db, issue_id=issue1.id, label_id=backend_label.id)
-        attach_label_if_missing(db, issue_id=issue1.id, label_id=auth_label.id)
-        attach_label_if_missing(db, issue_id=issue2.id, label_id=bug_label.id)
-        attach_label_if_missing(db, issue_id=issue3.id, label_id=backend_label.id)
+        print("Creating comments...")
+        seed_comments(db, issues, admin, ana, matej)
 
-        print("Demo data seeded successfully.")
+        print("\nDemo seed complete.")
         print("Users:")
-        print("  owner / OwnerPass1!")
-        print("  admin / AdminPass1!")
-        print("  member / MemberPass1!")
-        print("  viewer / ViewerPass1!")
-        print("Project key: DEMO")
+        print("  admin / Admin123!")
+        print("  ana / Ana12345!")
+        print("  matej / Matej123!")
+        print(f"Project: {project.key} - {project.name}")
 
     finally:
         db.close()

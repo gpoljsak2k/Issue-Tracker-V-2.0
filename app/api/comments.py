@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.core.permissions import (
@@ -66,6 +66,8 @@ def create_comment(
         action="comment_added",
         metadata_json={
             "comment_id": comment.id,
+            "body": comment.body,
+            "author_username": current_user.username,
         },
     )
 
@@ -173,6 +175,7 @@ def update_comment(
             "comment_id": comment.id,
             "old_body": old_body,
             "new_body": comment.body,
+            "author_username": current_user.username,
         },
     )
 
@@ -204,7 +207,9 @@ def delete_comment(
         )
 
     comment = db.scalar(
-        select(Comment).where(
+        select(Comment)
+        .options(selectinload(Comment.author))
+        .where(
             Comment.id == comment_id,
             Comment.issue_id == issue_id,
         )
@@ -240,6 +245,8 @@ def delete_comment(
         action="comment_deleted",
         metadata_json={
             "comment_id": comment.id,
+            "body": comment.body,
+            "author_username": comment.author.username,
         },
     )
 

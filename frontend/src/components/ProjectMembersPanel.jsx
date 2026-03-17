@@ -2,10 +2,10 @@ import { useState } from "react";
 
 function ProjectMembersPanel({
   selectedProject,
-  members,
-  membersLoading,
-  canManageMembers,
-  currentUser,
+  members = [],
+  membersLoading = false,
+  canManageMembers = false,
+  currentUser = null,
   onAddMember,
   onUpdateRole,
   onRemoveMember,
@@ -107,6 +107,7 @@ function ProjectMembersPanel({
               placeholder="Enter username"
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "10px 12px",
                 borderRadius: "8px",
                 border: "1px solid #cbd5e1",
