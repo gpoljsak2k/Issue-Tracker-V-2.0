@@ -1,3 +1,4 @@
+import api from "../api/client";
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -12,23 +13,22 @@ function LoginForm({ onLoginSuccess }) {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    try {
-      setLoading(true);
+    async function handleSubmit(e) {
+      e.preventDefault();
       setError("");
 
-      const formData = new URLSearchParams();
-      formData.append("username", username);
-      formData.append("password", password);
+      try {
+        const response = await api.post("/auth/login", {
+          username,
+          password,
+        });
 
-      const response = await axios.post(
-        "http://127.0.0.1:8000/auth/login",
-        formData,
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        }
-      );
+        const token = response.data.access_token;
+        // ostala logika
+      } catch (error) {
+        setError("Could not connect to backend.");
+      }
+    }
 
       onLoginSuccess(response.data.access_token);
     } catch (err) {
