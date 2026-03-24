@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import LoginForm from "../components/LoginForm";
+import RegisterForm from "../components/RegisterForm";
 import CreateIssueForm from "../components/CreateIssueForm";
 import ProjectsSidebar from "../components/ProjectsSidebar";
 import IssuesToolbar from "../components/IssuesToolbar";
@@ -57,8 +58,11 @@ import {
 } from "../utils/issueUi";
 
 function IssueTrackerPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
+
+  const isRegisterPage = location.pathname === "/register";
 
   const [token, setToken] = useState(getToken());
   const [currentUser, setCurrentUser] = useState(null);
@@ -898,27 +902,34 @@ function IssueTrackerPage() {
     loadIssueLabels(selectedProjectId, selectedIssueId);
   }, [selectedProjectId, selectedIssueId]);
 
-  useEffect(() => {
-    setIsEditingIssue(false);
-    setEditTitle("");
-    setEditDescription("");
-  }, [selectedIssueId]);
+    useEffect(() => {
+      setIsEditingIssue(false);
+      setEditTitle("");
+      setEditDescription("");
+    }, [selectedIssueId]);
 
-  useEffect(() => {
-    setIsEditingIssue(false);
-    setEditTitle("");
-    setEditDescription("");
-    setComments([]);
-    setIssueLabels([]);
-    setAssignedToMeOnly(false);
-    setIssuesOffset(0);
-  }, [selectedProjectId]);
+    useEffect(() => {
+      setIsEditingIssue(false);
+      setEditTitle("");
+      setEditDescription("");
+      setComments([]);
+      setIssueLabels([]);
+      setAssignedToMeOnly(false);
+      setIssuesOffset(0);
+    }, [selectedProjectId]);
 
-  if (!token) {
-    return <LoginForm onLoginSuccess={handleLoginSuccess} />;
-  }
+    if (!token) {
+      return isRegisterPage ? (
+        <RegisterForm onShowLogin={() => navigate("/login")} />
+      ) : (
+        <LoginForm
+          onLoginSuccess={handleLoginSuccess}
+          onShowRegister={() => navigate("/register")}
+        />
+      );
+    }
 
-  return (
+    return (
     <div
       style={{
         fontFamily: "Arial, sans-serif",

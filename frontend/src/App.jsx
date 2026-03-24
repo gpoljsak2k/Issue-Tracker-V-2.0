@@ -1,12 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import IssueTrackerPage from "./pages/IssueTrackerPage";
-import RegisterForm from "./components/RegisterForm";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<IssueTrackerPage />} />
-      <Route path="/register" element={<RegisterForm />} />
+      <Route path="/register" element={<IssueTrackerPage />} />
       <Route path="/projects/:projectId" element={<IssueTrackerPage />} />
       <Route
         path="/projects/:projectId/issues/:issueId"
