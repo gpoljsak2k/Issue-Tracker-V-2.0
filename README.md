@@ -114,7 +114,7 @@ The app is fully deployed using **Render**:
 - Database → PostgreSQL
 
 ## ⚠️ Important
-Render free Postgres database expires after **30 days**, so this deployment is intended for demo purposes.
+Render free Postgres database expires after **30 days**, so this deployment is intended for **demo purposes**.
 
 ---
 # Installation
