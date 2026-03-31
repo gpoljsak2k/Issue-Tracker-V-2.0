@@ -86,6 +86,7 @@ Tracks:
 # Tech Stack
 
 ## Backend
+- **Python**
 - **FastAPI**
 - **SQLAlchemy 2.0**
 - **PostgreSQL**
@@ -94,6 +95,7 @@ Tracks:
 - **Pytest**
 
 ## Frontend
+- **JavaScript**
 - **React**
 - **Vite**
 - **Axios**
