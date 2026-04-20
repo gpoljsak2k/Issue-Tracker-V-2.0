@@ -27,5 +27,8 @@ echo "Database is up."
 echo "Running migrations..."
 alembic upgrade head
 
+echo "Seeding demo data (if needed)..."
+python -m scripts.seed_demo || true
+
 echo "Starting app..."
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

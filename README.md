@@ -169,7 +169,6 @@ username:	 password:
 admin	     Admin123!
 matej        Matej123!
 ana	         Ana12345!
-
 ``` 
 
 Demo project key:

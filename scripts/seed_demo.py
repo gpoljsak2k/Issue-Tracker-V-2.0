@@ -208,11 +208,16 @@ def seed_comments(db, issues, admin, ana, matej):
     db.commit()
 
 
+from app.models.user import User
+
 def main():
     db = SessionLocal()
     try:
-        print("Resetting database...")
-        reset_database(db)
+        existing_user = db.execute(select(User)).first()
+
+        if existing_user:
+            print("Data already exists, skipping seed.")
+            return
 
         print("Creating demo users...")
         admin, ana, matej = seed_users(db)
@@ -236,15 +241,9 @@ def main():
         seed_comments(db, issues, admin, ana, matej)
 
         print("\nDemo seed complete.")
-        print("Users:")
-        print("  admin / Admin123!")
-        print("  ana / Ana12345!")
-        print("  matej / Matej123!")
-        print(f"Project: {project.key} - {project.name}")
 
     finally:
         db.close()
-
 
 if __name__ == "__main__":
     main()
